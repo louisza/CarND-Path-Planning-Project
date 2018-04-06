@@ -166,9 +166,10 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 double lane_cost_function(double dist,double speed)
 {
-  // cost function which takes into account how fast a lane is moving and space available
-  double cost_tmp = exp(-1/dist)+exp(1/speed);
-  if(dist < 20)
+  // cost function which takes into account speed and distance
+  double cost_tmp = 0;
+  cost_tmp = exp(-1/dist)+exp(1/speed);
+  if(dist < 20 && dist > -5)
   {
    cost_tmp = 999;
   }
@@ -217,7 +218,7 @@ int main() {
   int lane = 1;
 
   // max speed and target velocity
-  double max_speed = 49.5;
+  double max_speed = 47.5;
   double ref_v = 0.0; 
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &max_speed, &ref_v](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -271,11 +272,22 @@ int main() {
             double right_space;
             double current_space;
 
-            double left_cost = 0;
-            double right_cost = 0;
-            double current_cost = 0;
+            double left_cost;
+            double left_car_cost;
+            double right_cost;
+            double right_car_cost;
+            double current_cost;
+            double current_car_cost = 0;
+            double follow_speed;
+            double follow_distance;
+
+            current_cost = 0;
+            left_cost = 1;
+            right_cost = 1;
 
 		    // iterates over all vehicles that were detected by sensors
+		    // todo filter for onl relevant cars for example closest car to the front and to the
+		    // back in each lane
             for(int i = 0; i < sensor_fusion.size(); i ++)
             {
 
@@ -286,7 +298,7 @@ int main() {
               double speed = sqrt(vx*vx + vy*vy);
               double check_car_s = sensor_fusion[i][5];
 
-              // check for car in my lane
+              // check for car in current lane
               if(d < (2+4*lane+2) && d > (2+4*lane-2))
               {
 
@@ -294,15 +306,17 @@ int main() {
                 check_car_s += ((double)prev_size*.02*speed);
 
                 current_space = check_car_s - car_s;
-                double current_car_cost = lane_cost_function(current_space, speed);
+                current_car_cost = lane_cost_function(current_space, speed);
 
-                if(current_car_cost > current_cost)
-                {
-                 current_cost = current_car_cost;
-                }
+                // Store the highest cost
+                if(current_car_cost>current_cost)
+                {current_cost = current_car_cost;}
 
+                // a cost of 999 is assigned for non-viable lanes
                 if(current_cost == 999)
                 {
+                 // the current lanes cost of 999 is adjusted to 900 to force a no lane change
+                 // into a 999 lane
                  current_cost = 900;
                 }
 
@@ -310,9 +324,12 @@ int main() {
                 if ((check_car_s > car_s) && ((check_car_s - car_s) < 20))
                 {
                   too_close = true;
+                  // set follow speed to prevent constant acc dec
+                  // this is not working yet, a possible solution is to do a smoothed speed change
+                  // based on the circumstances
+                  follow_speed = speed;
+                  follow_distance = check_car_s - car_s;
                 }
-
-
               }
 
               //check if car in lane to the left
@@ -323,12 +340,14 @@ int main() {
                     check_car_s += ((double)prev_size*.02*speed);
 
                     left_space = check_car_s - car_s;
-                    double left_car_cost = lane_cost_function(left_space, speed);
+                    left_car_cost = lane_cost_function(left_space, speed);
+                    //cout << left_car_cost << endl;
 
+                    //only store the highest cost
                     if(left_car_cost > left_cost)
                     {left_cost = left_car_cost;}
-                  } else { left_cost = 999;}
-              }
+                  }
+              }  else { left_cost = 999;}
 
               //check if car in lane to the right
               if(lane<2)
@@ -338,21 +357,30 @@ int main() {
                     check_car_s += ((double)prev_size*.02*speed);
 
                     right_space = check_car_s - car_s;
-                    double right_car_cost = lane_cost_function(right_space, speed);
+                    right_car_cost = lane_cost_function(right_space, speed);
 
                     if(right_car_cost > right_cost)
                     {right_cost = right_car_cost;}
-                  } else {right_cost = 999;}
-              }
+                  }
+              }  else {right_cost = 999;}
             }
 
           //Decide on lane
-          if(left_cost < current_cost/1.05 && left_cost < right_cost / 1.08)
+
+          // debug the cost function
+          cout << "CurrentCost: " << current_cost << " LeftCost: " << left_cost << " RightCost: "
+           << right_cost << endl;
+
+          // Lane change action is detemirned by the cost function with a preference towards a
+          // lane change to the left
+          if(left_cost < (current_cost+0.01) && left_cost < right_cost+0.02)
           {
-           lane = lane -1;
-          } else if(right_cost < current_cost/1.05 && right_cost < left_cost / 1.08)
+           lane = lane - 1;
+           cout << "LCL" << endl;
+          } else if(right_cost < current_cost-0.02)
           {
            lane = lane + 1;
+           cout << "LCR" << endl;
           }
 
           // or stay in current lane
@@ -362,14 +390,25 @@ int main() {
           if(too_close)
           {
             // slow down
-            ref_v -= 1.25;
+            ref_v -= 0.85;
+            if(ref_v < follow_speed && follow_distance > 15)
+            {
+                ref_v += 0.85;
+                if (ref_v > follow_speed)
+                {
+                ref_v = follow_speed;
+                }
+            }
           }
 
             // accelerate to speed limit
           else if(ref_v < max_speed)
           {
-            ref_v += 1.5;
+            ref_v += 0.85;
           }
+
+          if(ref_v > max_speed)
+          {ref_v -= 0.5;}
 
 
           // create waypoints
@@ -447,7 +486,7 @@ int main() {
         vector<double> next_x_vals;
         vector<double> next_y_vals;
 
-        // populate next vals with remaining pacman dots
+        // populate next vals with remaining points
         for (int i = 0; i < prev_size; i++)
         {
           next_x_vals.push_back(previous_path_x[i]);
@@ -475,7 +514,7 @@ int main() {
           double x_ref = x_point;
           double y_ref = y_point;
 
-          // rotat back to normal plane
+          // rotate back to normal plane
           x_point = (x_ref * cos(ref_yaw) - y_ref*sin(ref_yaw));
           y_point = (x_ref * sin(ref_yaw) + y_ref*cos(ref_yaw));
 
