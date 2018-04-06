@@ -12,6 +12,19 @@ Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoi
 
 The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
 
+## Project write up
+
+My implementation utilises two main techniques in order to accomplish the set goals.
+
+The path planning is done by converting to and from xy coordinates and frenet coordinates and the fitting a spline to smooth the path. The frenet system simplifies path planning tremenduosly and the spline function works realy well due to smooth interpolation and the linear extrapolation.
+
+The lane change decisions is based on a simple cost function. The cost function assigns a cost based on space available and speed of lane. 
+The cost is adjusted to favour left lane changes.
+
+The implementation works, but I have had some failed attempts. Mostly when cars close in front stop abruptly, or when doing more than one lane change in one manuever.
+
+Proposed next steps would be to also smooth the speed adjustments and filter out sensor data for non-relevant cars.
+
 ## Basic Build Instructions
 
 1. Clone this repo.
@@ -134,6 +147,10 @@ that's just a guess.
 
 One last note here: regardless of the IDE used, every submitted project must
 still be compilable with cmake and make./
+
+## Reference and thanks
+
+Thanks to https://github.com/veldrin23/CarND-T3-Project1 my colleague and friend for the help
 
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
