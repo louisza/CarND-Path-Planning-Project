@@ -371,16 +371,24 @@ int main() {
           cout << "CurrentCost: " << current_cost << " LeftCost: " << left_cost << " RightCost: "
            << right_cost << endl;
 
-          // Lane change action is detemirned by the cost function with a preference towards a
+          // Lane change action is determined by the cost function with a preference towards a
           // lane change to the left
           if(left_cost < (current_cost+0.01) && left_cost < right_cost+0.02)
           {
            lane = lane - 1;
+
+           // only one lane change at a time
+           if(lane + 2 < car_d/4)
+           {lane += 1;}
+
            cout << "LCL" << endl;
           } else if(right_cost < current_cost-0.02)
           {
            lane = lane + 1;
-           cout << "LCR" << endl;
+
+           if(lane - 1 > car_d/4)
+           {lane -= 1;}
+           cout << "LCR " << car_d << endl;
           }
 
           // or stay in current lane
