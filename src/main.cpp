@@ -398,10 +398,10 @@ int main() {
           if(too_close)
           {
             // slow down
-            ref_v -= 0.85;
+            ref_v -= 0.28;
             if(ref_v < follow_speed && follow_distance > 15)
             {
-                ref_v += 0.85;
+                ref_v += 0.1;
                 if (ref_v > follow_speed)
                 {
                 ref_v = follow_speed;
@@ -412,11 +412,11 @@ int main() {
             // accelerate to speed limit
           else if(ref_v < max_speed)
           {
-            ref_v += 0.85;
+            ref_v += 0.22;
           }
 
           if(ref_v > max_speed)
-          {ref_v -= 0.5;}
+          {ref_v -= 0.05;}
 
 
           // create waypoints
